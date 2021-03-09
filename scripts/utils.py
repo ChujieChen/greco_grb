@@ -94,3 +94,17 @@ def stay_awake(interval=180):
         print("{:d} min".format(int(cnt*interval/60.)), end = ' -> ')
         time.sleep(interval)
         cnt += 1
+        
+def ensure_dir(dirname):
+    """Make sure ``dirname`` exists and is a directory."""
+    try:
+        from os import errno
+    except:
+        import errno
+    if not os.path.isdir(dirname):
+        try:
+            os.makedirs(dirname)   # throws if exists as file
+        except OSError as e:
+            if e.errno != errno.EEXIST:
+                raise
+    return dirname

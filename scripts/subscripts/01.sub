@@ -1,0 +1,57 @@
+###### executable can be a softlink to ~ that is stored at /cvmfs ######
+executable = /cvmfs/icecube.opensciencegrid.org/users/cjchen/greco_grb/scripts/01_get_versatile_background_allsky_scan.py
+arguments = " --grb_name $(grb_name) --batchNtrials $(batchNtrials) --batchIndex $(batchIndex) --tw_in_second $(tw_in_second) --totalNtrials $(totalNtrials) --ncpu $(ncpu) --mode $(mode) --outfilename $(outfilename)"
+
+###### log, out, err ######
+log = /scratch/cjchen/log/allsky_scans/tw$(tw_in_second)/$(grb_name)_batchSize$(batchNtrials)_batchIndex$(batchIndex)_tw$(tw_in_second).log
+output = /scratch/cjchen/output/allsky_scans/tw$(tw_in_second)/$(grb_name)_batchSize$(batchNtrials)_batchIndex$(batchIndex)_tw$(tw_in_second).out
+error = /scratch/cjchen/error/allsky_scans/tw$(tw_in_second)/$(grb_name)_batchSize$(batchNtrials)_batchIndex$(batchIndex)_tw$(tw_in_second).err
+
+###### Need this to match the grid certificate you create in /tmp/ ######
+# when you run "voms-proxy-init -bits 1024 -valid 300:00"
+environment = "X509_USER_PROXY=x509up_u25153;PYTHONPATH=${PYTHONPATH}:/cvmfs/icecube.opensciencegrid.org/users/cjchen/csky"
+
+use_x509userproxy=true
+
+###### Any file needed that is not on /cvmfs (softlink does not help here; sperate with comma) ######
+transfer_input_files = /tmp/x509up_u25153,/home/cjchen/2020-2021/Spring2021/greco_grb/scripts/utils.py,/home/cjchen/2020-2021/Spring2021/greco_grb/scripts/SETTING.py
+
+###### What's the name of the output file to transfer? ######
+# This will copy files to the submit directory, so try to be aware of
+# how many files you'll get!
+######## Transfer out ###############
+transfer_output_files = $(grb_name)_batchSize$(batchNtrials)_batchIndex$(batchIndex)_tw$(tw_in_second).npz
+#### below line ends with a slash
+initialdir = /scratch/cjchen/csky_output/tw$(tw_in_second)/
+####################################
+
+
+# Transfer input and output files back and forth between clusters
+should_transfer_files = YES
+when_to_transfer_output = ON_EXIT
+request_memory = 8GB
+request_disk = 1GB
+request_cpus = $(ncpu)
+Universe = vanilla
+Notification = never
+
+######### https://wiki.icecube.wisc.edu/index.php/Setup_for_OSG ###########
+## run on OSG
+## +WantGlidein = True
++NATIVE_OS = True
+Requirements = HAS_CVMFS_icecube_opensciencegrid_org && (OpSysMajorVer =?= 7) && GLIDEIN_Site =!= "ComputeCanada-Cedar"
+max_retries = 5
++osg_site_blacklist = "ComputeCanada-Cedar"
+############ +OriginalTime = <num_seconds>
++OriginalTime = 259200
+###########################################################################
+# GO!
+queue
+
+####################################
+#
+# Don't forget to copy .sub and .dag 
+# to /scratch/cjchen/submit/ before run:                     
+#     condor_q_dag 01.dag    
+#
+####################################
