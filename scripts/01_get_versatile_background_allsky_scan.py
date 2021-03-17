@@ -10,17 +10,17 @@ Combine this map with GBM healpix maps or grab a single pixel
 for non-GBM bursts.
 """
 ###################### OSG Specific ###########################
-import sys
-modules_dir = '/cvmfs/icecube.opensciencegrid.org/users/cjchen'
-sys.path.append(modules_dir+'/csky')
-sys.path.append(modules_dir+'/greco_grb')
-sys.path.append(modules_dir+'/python3.7/site-packages/')
+# import sys
+# modules_dir = '/cvmfs/icecube.opensciencegrid.org/users/cjchen'
+# sys.path.append(modules_dir+'/csky')
+# sys.path.append(modules_dir+'/greco_grb')
+# sys.path.append(modules_dir+'/python3.7/site-packages/')
 ###############################################################
-
-print("Python version: ", end=' ')
-print(sys.version)
 import os
 import sys
+print("Python version: ", end=' ')
+print(sys.version)
+
 import numpy as np
 import healpy as hp
 # import histlite as hl
@@ -41,7 +41,7 @@ time = timer.time
 
 ###### Local Import ######
 import SETTING
-paths = SETTING.PATH(osg=True)
+paths = SETTING.PATH(osg=False)
 print(paths)
 LOCATION = paths.LOCATION
 USER = paths.USER
@@ -69,8 +69,6 @@ p.add_argument("--grb_name", default="GRB180423A", type=str, help="Name of one G
 p.add_argument("--batchNtrials", default=10, type=int, help="Number of trials in this batch")
 p.add_argument("--batchIndex", default=0, type=int, help="Index of current batch")
 p.add_argument("--tw_in_second", default=10, type=int, help="Length of the time window in seconds")
-p.add_argument("--concat", default=0, type=int, help="TODO: True(1) for the last batchIndex. used to clear up everything")
-p.add_argument("--totalNtrials", default=100, type=int, help="Number of total trials (1e8)")
 p.add_argument("--ncpu", default=1, type=int, help="Number of CPU to give Csky")
 p.add_argument("--mode", default="production", type=str, help="Mode: production or testing")
 p.add_argument("--outfilename", default="", type=str, help="Output filename should have type .npz. Highly recommended on OSG")
@@ -85,8 +83,6 @@ class args:
     batchNtrials = 40
     batchIndex = 0
     tw_in_second = 10
-    concat=0
-    totalNtrials = 40
     ncpu = 4
     mode = "testing"
     outfilename = ""
@@ -127,7 +123,7 @@ sig_filenames = sorted(glob(data_dir + '/IC86_2012.nue_merged_with_angErr.npy'))
 grl_filenames = sorted(glob(data_dir + '/GRL/IC86_20*.data.npy'))
 
 ################ energy lower bound #############
-min_log_e = np.log10(30)
+min_log_e = np.log10(10)
 #################################################
 bins_sindec = np.linspace(-1, 1, 25+1)  
 bins_logenergy = np.linspace(min_log_e, 5, 30+1)
@@ -149,12 +145,12 @@ dataset_spec = cy.selections.CustomDataSpecs.CustomDataSpec(data, sig, np.sum(gr
                                                      logenergy_bins=bins_logenergy,
                                                      grl=grl, key='greco_v2.4', cascades=True)
 
-# ana_dir = cy.utils.ensure_dir(ANA_DIR)
+ANA_DIR = cy.utils.ensure_dir(ANA_DIR)
 # on OSG
-ana_dir = "./"
+# ana_dir = "./"
 ana = cy.get_analysis(cy.selections.repo
                       , dataset_spec
-                      , dir=ana_dir
+                      , dir=ANA_DIR
                       , load_sig=False)  # to save memory    
 
 conf = {
@@ -219,11 +215,11 @@ with time("To scipy.sparse npz"):
                                                                     args.batchIndex, 
                                                                     args.tw_in_second)
 ## on locations other than OSG
-#     output_folder = cy.utils.ensure_dir(ANA_DIR)
-#     sparse.save_npz(output_folder+"/{}".format(outfilename)
-#                     ,hp_sparse)
+    output_folder = cy.utils.ensure_dir(ANA_DIR+"/allsky_scan/no_prior_versatile/tw{}".format(args.tw_in_second))
+    sparse.save_npz(output_folder+"/{}".format(outfilename)
+                    ,hp_sparse)
 ## on OSG
-    sparse.save_npz("{}".format(outfilename)
-                    ,hp_sparse)           
+#     sparse.save_npz("{}".format(outfilename)
+#                     ,hp_sparse)           
 ##
 print("######## All Done. ###########")

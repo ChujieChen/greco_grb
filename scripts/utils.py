@@ -27,16 +27,17 @@ def java_hash(s):
     return ((h + 0x80000000) & 0xFFFFFFFF) - 0x80000000
 
 
-def isf_healpix(arr, q=0.95):
+def isf_healpix(arr, q=0.999):
     """
     A customized isf for a healpix map (Inverse Survival Function (Inverse of SF))
+    It is much safer than skylab.priors.pixel_cut().
     
     Parameters
     ----------
     arr : array_like
         A healpix map. normally we have np.sum(arr) = 1. but it's not neccessary.
         
-    q : array_like (0.0 ~ 1.0, default=0.95)
+    q : array_like (0.0 ~ 1.0, default=0.999)
         upper tail probability
     
     Returns
@@ -96,8 +97,25 @@ def stay_awake(interval=180):
         cnt += 1
         
 def ensure_dir(dirname):
-    """Make sure ``dirname`` exists and is a directory."""
+    """
+    Make sure ``dirname`` exists and is a directory.
+    
+    Parameters
+    ----------
+    dirname : str
+        The pathname of the directory
+    
+    Returns
+    -------
+    s : str
+        The pathname of the directory
+    
+    See also
+    -------
+    An implementation from csky: csky.utils.ensure_dir()
+    """
     try:
+        import os
         from os import errno
     except:
         import errno

@@ -97,8 +97,8 @@ for tw_in_second in tws_in_second:
                 delete_out = " "
             exeScript = [
                 "#PBS -N {}_tw{}_batchSize{}_batchIndex{}".format(grb, tw_in_second, batchSize, idx),
-                "#PBS -l nodes=1:ppn=1",
-                "#PBS -l pmem=1gb",
+                "#PBS -l nodes=1:ppn=1",             # number of nodes and cores per node required
+                "#PBS -l pmem=1gb",                  # memory per core
                 "#PBS -l walltime=3:00:00",
                 "#PBS -q hive",
                 "#PBS -j oe",

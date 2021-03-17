@@ -1,0 +1,1 @@
+GRB180423A	2500	43	10	4	production	GRB180423A_batchSize2500_batchIndex43_tw10.npz
