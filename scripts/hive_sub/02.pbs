@@ -5,7 +5,7 @@
 #PBS -q hive
 #PBS -j oe
 #PBS -o /storage/home/hhive1/cchen641/scratch/icecube/job_pbs_out/out/02.out
-#PBS -t 1-414%400
+#PBS -t 1-69%400
 cd /storage/home/hhive1/cchen641/icecube/greco_grb/scripts
 icpy3
 params=`sed -n "${PBS_ARRAYID} p" hive_sub/02.txt`
