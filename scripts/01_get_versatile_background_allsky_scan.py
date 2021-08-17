@@ -79,7 +79,7 @@ args = p.parse_args()
 """
 class args:
     grb_name = "GRB180423A"    # real healpix example
-    # grb_name = "GRB190611B"    # fake healpix example
+    # grb_name = "GRB190415A/GRB190611B"    # fake healpix example
     batchNtrials = 40
     batchIndex = 0
     tw_in_second = 10
