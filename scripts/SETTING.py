@@ -16,7 +16,8 @@ class PATH:
         if username == "cchen641":
             print("\n#### Working at GT ####\n")
             location = "GT"
-            icdata_dir = "/storage/home/hhive1/cchen641/data/icecube/data/analyses/online_GRECO/version-002-p04"
+            # icdata_dir = "/storage/home/hhive1/cchen641/data/icecube/data/analyses/online_GRECO/version-002-p04"
+            icdata_dir = "/storage/home/hhive1/cchen641/data/icecube/data/analyses/online_GRECO/candidate-002-p10"
             data_dir = "/storage/home/hhive1/cchen641/data/icecube/data/greco_grb/data"
             ana_dir = data_dir + "/csky_output"
 

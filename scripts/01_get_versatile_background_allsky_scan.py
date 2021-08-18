@@ -97,11 +97,15 @@ if args.mode != "production" and LOCATION != "IC-OSG":
 # All times in days, all angles in degrees
 try:
     print("Loading pkl in DATA_DID")
-    df = pd.read_pickle(DATA_DIR+"/grbwebgbm/grbweb_gbm_noHeaplix.pkl")
+#     df = pd.read_pickle(DATA_DIR+"/grbwebgbm/grbweb_gbm_noHeaplix.pkl")
+    df = pd.read_pickle(DATA_DIR+"/grbwebgbm/grbweb_gbm_noHeaplix_2297.pkl")
+    
 except:
     try:
         print("Loading pkl in current path")
-        df = pd.read_pickle("grbweb_gbm_noHeaplix.pkl")
+#         df = pd.read_pickle("grbweb_gbm_noHeaplix.pkl")
+        df = pd.read_pickle("grbweb_gbm_noHeaplix_2297.pkl")
+    
     except:
         raise Exception("Cannot pd.reade_picle() the grbweb_gbm_noHeaplix.pkl.\n")
 
@@ -116,17 +120,19 @@ print("\n...Done\n")
 
 print("\n===== Setting up csky =====\n")
 data_dir = ICDATA_DIR
-data_filenames = sorted(glob(data_dir + '/IC86_20*.data_with_angErr.npy'))
+# data_filenames = sorted(glob(data_dir + '/IC86_20*.data_with_angErr.npy'))
+data_filenames = sorted(glob(data_dir + '/IC86_20*.data.npy'))
 # sig_filenames = sorted(glob(data_dir + '/IC86_2012.nu*_merged_with_angErr.npy'))
 # load nue only to save memory, never used in this .py
-sig_filenames = sorted(glob(data_dir + '/IC86_2012.nue_merged_with_angErr.npy'))
+sig_filenames = sorted(glob(data_dir + '/IC86_2012.nu*_merged.npy'))
 grl_filenames = sorted(glob(data_dir + '/GRL/IC86_20*.data.npy'))
 
 ################ energy lower bound #############
 min_log_e = np.log10(10)
 #################################################
 bins_sindec = np.linspace(-1, 1, 25+1)  
-bins_logenergy = np.linspace(min_log_e, 5, 30+1)
+# bins_logenergy = np.linspace(min_log_e, 5, 30+1)
+bins_logenergy = np.linspace(min_log_e, 4, 25+1)
 
 data = [np.load(data_filename) for data_filename in data_filenames]
 data = np.hstack(data)
@@ -143,7 +149,7 @@ if min_log_e is not None:
 dataset_spec = cy.selections.CustomDataSpecs.CustomDataSpec(data, sig, np.sum(grl['livetime']),
                                                      sindec_bins=bins_sindec,
                                                      logenergy_bins=bins_logenergy,
-                                                     grl=grl, key='greco_v2.4', cascades=True)
+                                                     grl=grl, key='greco_v2.10', cascades=True)
 
 ANA_DIR = cy.utils.ensure_dir(ANA_DIR)
 # on OSG
