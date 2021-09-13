@@ -54,7 +54,7 @@ args = p.parse_args()
 ##########################
 
 print("\n===== Loading no-healpix df =====\n")
-df = pd.read_pickle(DATA_DIR+"/grbwebgbm/grbweb_gbm_noHeaplix.pkl")
+df = pd.read_pickle(DATA_DIR+"/grbwebgbm/grbweb_gbm_noHeaplix_2297.pkl")
 print("\n===== Done =====\n")
 
 print("\n===== Loading no-healpix background all-sky scan =====\n")
