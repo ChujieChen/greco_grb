@@ -1,1 +1,0 @@
-../scripts/SETTING.py
