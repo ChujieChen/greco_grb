@@ -56,7 +56,6 @@ def isf_healpix(arr, q=0.999):
         raise ImportError("Numpy cannot imported")
     if q == 1:
         return 0
-    arr = np.maximum(np.array(arr), 0)
     sorted_arr = np.sort(arr)
     cumsum = np.cumsum(sorted_arr)
     cdf = cumsum / cumsum[-1]
@@ -64,7 +63,7 @@ def isf_healpix(arr, q=0.999):
     # np.searchsorted(a,v): a has to be ascending
     idx = np.searchsorted(cdf, 1-q, side="left")
     # we return the nearest (to q) one
-    if idx > 0 and (idx == len(sorted_arr) or abs(q - sorted_arr[idx-1]) < abs(q - sorted_arr[idx])):
+    if idx > 0 and (idx == len(sorted_arr) or abs(1-q - cdf[idx-1]) < abs(1-q - cdf[idx])):
         return sorted_arr[idx-1]
     return sorted_arr[idx]
     
