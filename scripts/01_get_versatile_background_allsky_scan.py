@@ -40,8 +40,9 @@ timer = cy.timing.Timer()
 time = timer.time
 
 ###### Local Import ######
-import SETTING
-paths = SETTING.PATH(osg=False)
+sys.path.append('../../')
+from greco_grb.scripts import SETTING
+paths = SETTING.PATH()
 print(paths)
 LOCATION = paths.LOCATION
 USER = paths.USER
@@ -49,7 +50,7 @@ ICDATA_DIR = paths.ICDATA_DIR
 DATA_DIR = paths.DATA_DIR
 ANA_DIR = paths.ANA_DIR
 
-from utils import *
+from greco_grb.scripts.utils import *
 
 tw_batchSize_map = {
                  10:1000,       # 59 cpu seconds/trial
@@ -165,7 +166,7 @@ conf = {
     'space': 'ps', # ps/fitps/template/prior
     'time': 'transient', # utf/lc/transient
     'energy': 'customflux', # fit/customflux
-    'flux': cy.hyp.PowerLawFlux(2),
+    'flux': cy.hyp.PowerLawFlux(2.5),
     #### inj.py - prior has some duplications against space's prior
     'sig': 'transient', # ps/tw/lc/transient/template/prior
     'full_sky': True,
