@@ -22,8 +22,9 @@ timer = cy.timing.Timer()
 time = timer.time
 
 ###### Local Import ######
-import SETTING
-paths = SETTING.PATH(osg=False)
+sys.path.append('../../')
+from greco_grb.scripts import SETTING
+paths = SETTING.PATH()
 print(paths)
 LOCATION = paths.LOCATION
 USER = paths.USER
@@ -31,7 +32,7 @@ ICDATA_DIR = paths.ICDATA_DIR
 DATA_DIR = paths.DATA_DIR
 ANA_DIR = paths.ANA_DIR
 
-from utils import *
+from greco_grb.scripts.utils import *
 
 import argparse
 ######################### CONFIGURE ARGUEMENTS #############################
@@ -54,7 +55,7 @@ args = p.parse_args()
 ##########################
 
 print("\n===== Loading no-healpix df =====\n")
-df = pd.read_pickle(DATA_DIR+"/grbwebgbm/grbweb_gbm_noHeaplix_2297.pkl")
+df = pd.read_pickle(DATA_DIR+"/grbwebgbm/grbweb_gbm_noHealpix_2268.pkl")
 print("\n===== Done =====\n")
 
 print("\n===== Loading no-healpix background all-sky scan =====\n")
