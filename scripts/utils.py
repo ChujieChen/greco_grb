@@ -1,7 +1,8 @@
 """
 Some of my commonly used functions
 """
-
+import numpy as np
+from scipy import sparse
 
 def java_hash(s):
     """
@@ -125,3 +126,36 @@ def ensure_dir(dirname):
             if e.errno != errno.EEXIST:
                 raise
     return dirname
+
+
+def getCombinedMaxTSfromFile(healpix, file):
+    """
+    Parameters
+    ----------
+    healpix : array_like
+        A prior healpix map. shape [hp.nside2pix(64), ]
+        
+    file : str
+        Path to the no_prior background trial file. One file could contain
+        multiple trials
+    
+    Returns
+    -------
+    TSs : list
+        A list of maximum TSs from the combined backgrounds.
+    
+    See also
+    -------
+    N/A
+    """
+    scans = sparse.load_npz(file)
+    healpix = np.maximum(healpix, 1e-15)
+    tss = scans.copy()
+    # non-overlapping region will have negative TS anyways
+    tss.data += 2. * (np.log(healpix[scans.indices]) - np.log(np.max(healpix)))
+    tss.data[~np.isfinite(tss.data)] = 0
+    tss.data[tss.data < 0] = 0
+    TSs = tss.max(axis=1).A
+    TSs = np.hstack(np.array(TSs))
+    return TSs
+
