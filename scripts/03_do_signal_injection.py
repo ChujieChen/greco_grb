@@ -7,7 +7,7 @@
 40  different injections (0 ~ 9.1, step=0.2)
 500 trials for each n_inj (run on 1 core)
 20 s/trial
-= 2k cpu hr = 1600 hivecpu * 2 hr
+= 2k cpu hr = 1000 hivecpu * 2 hr
 
 tws_in_second    = [  10,     25,    50,   100,   250,   500][::-1] 
 """
@@ -37,16 +37,16 @@ timer = cy.timing.Timer()
 time = timer.time
 
 ###### Local Import ######
-import SETTING
-paths = SETTING.PATH(osg=False)
+sys.path.append('../../')
+from greco_grb.scripts import SETTING
+paths = SETTING.PATH()
 print(paths)
 LOCATION = paths.LOCATION
 USER = paths.USER
 ICDATA_DIR = paths.ICDATA_DIR
 DATA_DIR = paths.DATA_DIR
 ANA_DIR = paths.ANA_DIR
-
-from utils import *
+from greco_grb.scripts.utils import *
 
 import argparse
 ######################### CONFIGURE ARGUEMENTS #############################
@@ -66,6 +66,7 @@ args = p.parse_args()
 # class args:
 #     grb_name = "GRB180423A"    # real healpix example
 #     # grb_name = "GRB190415A"    # fake healpix example
+#     # grb_name = "GRB170529A"
 #     n_inj = 10
 #     n_trials = 10
 #     tw_in_second = 10
@@ -75,9 +76,7 @@ args = p.parse_args()
 ##########################
 
 print("\n===== Loading no-healpix df =====\n")
-df = pd.read_pickle(DATA_DIR+"/grbwebgbm/grbweb_gbm_noHeaplix.pkl")
-# realHealpix: df.gbm & df.hasHealpix
-# fakeHealpix: ~(df.gbm & df.hasHealpix)
+df = pd.read_pickle(DATA_DIR+"/grbwebgbm/grbweb_gbm_noHealpix_2268.pkl")
 df.head()
 
 print("\n===== Loading healpix of {}=====\n".format(args.grb_name))   
@@ -99,17 +98,15 @@ print("\n...Done\n")
 
 print("\n===== Setting up csky =====\n")
 data_dir = ICDATA_DIR
-data_filenames = sorted(glob(data_dir + '/IC86_20*.data_with_angErr.npy'))
-sig_filenames = sorted(glob(data_dir + '/IC86_2012.nu*_merged_with_angErr.npy'))
-# load nue only to save memory, never used in this .py
-# sig_filenames = sorted(glob(data_dir + '/IC86_2012.nue_merged_with_angErr.npy'))
+data_filenames = sorted(glob(data_dir + '/IC86_20*.data.npy'))
+sig_filenames = sorted(glob(data_dir + '/IC86_2012.nu*_merged.npy'))
 grl_filenames = sorted(glob(data_dir + '/GRL/IC86_20*.data.npy'))
 
 ################ energy lower bound #############
 min_log_e = np.log10(10)
 #################################################
 bins_sindec = np.linspace(-1, 1, 25+1)  
-bins_logenergy = np.linspace(min_log_e, 5, 30+1)
+bins_logenergy = np.linspace(min_log_e, 4, 25+1)
 
 data = [np.load(data_filename) for data_filename in data_filenames]
 data = np.hstack(data)
@@ -126,7 +123,7 @@ if min_log_e is not None:
 dataset_spec = cy.selections.CustomDataSpecs.CustomDataSpec(data, sig, np.sum(grl['livetime']),
                                                      sindec_bins=bins_sindec,
                                                      logenergy_bins=bins_logenergy,
-                                                     grl=grl, key='greco_v2.4', cascades=True)
+                                                     grl=grl, key='greco_v2.10', cascades=True)
 
 ANA_DIR = cy.utils.ensure_dir(ANA_DIR)
 # on OSG
@@ -143,7 +140,7 @@ conf = {
     'space': 'ps', # ps/fitps/template/prior
     'time': 'transient', # utf/lc/transient
     'energy': 'customflux', # fit/customflux
-    'flux': cy.hyp.PowerLawFlux(2),
+    'flux': cy.hyp.PowerLawFlux(2.5),
     #### inj.py - prior has some duplications against space's prior
     'sig': 'transient', # ps/tw/lc/transient/template/prior
     'full_sky': True,
@@ -174,16 +171,29 @@ src = cy.sources(
 
 seed = abs(java_hash(src.name[0]+"_signal_batchIndex{}".format(args.batchIndex)))
 
+"""
 sptr = cy.get_spatial_prior_trial_runner(conf=cy.CONF
                                          ,src_tr=src
                                          ,llh_priors=[healpix]
                                          ,cut_n_sigma=5.) # src_tr is must for transient
+"""
+
+tr = cy.get_trial_runner(conf=cy.CONF, ana=ana, src=src)
+
 with time('Doing injections'):
+    """
     trials = sptr.get_many_fits(args.n_trials, 
                           n_sig=args.n_inj, 
                           poisson=args.use_poisson, 
                           seed=seed, 
                           logging=False)
+    """
+    trials = tr.get_many_fits(args.n_trials, 
+                      n_sig=args.n_inj, 
+                      poisson=args.use_poisson, 
+                      seed=0, 
+                      logging=False)
+    
 print("\n...Done\n")
 print("\n===== Saving results =====\n")
 outfilename = "{}_batchSize{}_batchIndex{}_tw{}_ninj{}.npy".format(args.grb_name, 
