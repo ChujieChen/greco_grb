@@ -160,6 +160,11 @@ ana = cy.get_analysis(cy.selections.repo
                       , dir=ANA_DIR
                       , load_sig=False)  # to save memory    
 
+###################### high/low background rates ##################
+N_bg_multiplier_high = 0.00503 / 0.00461
+N_bg_multiplier_low = 0.00420 / 0.00461
+#####################################################################
+###################### high background rates ##################
 conf = {
     'ana': ana,
     #### llh basics: csky.conf
@@ -172,7 +177,8 @@ conf = {
     'full_sky': True,
     'extended': True,
     'mp_cpus': args.ncpu,
-    'cut_n_sigma': 3
+    'cut_n_sigma': 3,
+    'N_bg_multiplier': N_bg_multiplier_high
     }
 
 cy.CONF.update(conf)
@@ -222,11 +228,77 @@ with time("To scipy.sparse npz"):
                                                                     args.batchIndex, 
                                                                     args.tw_in_second)
 ## on locations other than OSG
-    output_folder = cy.utils.ensure_dir(ANA_DIR+"/allsky_scan/no_prior_versatile/tw{}".format(args.tw_in_second))
+    output_folder = cy.utils.ensure_dir(ANA_DIR+"/allsky_scan/no_prior_versatile/high/tw{}".format(args.tw_in_second))
     sparse.save_npz(output_folder+"/{}".format(outfilename)
                     ,hp_sparse)
-## on OSG
-#     sparse.save_npz("{}".format(outfilename)
-#                     ,hp_sparse)           
-##
+#####################################################################
+###################### low background rates ##################
+conf = {
+    'ana': ana,
+    #### llh basics: csky.conf
+    'space': 'ps', # ps/fitps/template/prior
+    'time': 'transient', # utf/lc/transient
+    'energy': 'customflux', # fit/customflux
+    'flux': cy.hyp.PowerLawFlux(2.5),
+    #### inj.py - prior has some duplications against space's prior
+    'sig': 'transient', # ps/tw/lc/transient/template/prior
+    'full_sky': True,
+    'extended': True,
+    'mp_cpus': args.ncpu,
+    'cut_n_sigma': 3,
+    'N_bg_multiplier': N_bg_multiplier_low
+    }
+
+cy.CONF.update(conf)
+
+print("\n===== Generating seeds for current batch =====\n")   
+src = cy.utils.Sources(
+    ra=ra,
+    dec=dec,
+    deg=True,
+    mjd=tw_start, 
+    sigma_t=np.zeros_like(tw), 
+    t_100=tw,  # in days
+    # prior=[hl.heal.HealHist(healpix)],
+    name=args.grb_name
+)
+sstr = cy.get_sky_scan_trial_runner(conf=cy.CONF
+                                    ,nside=64
+                                    ,src_tr=src)
+
+rng=np.random.default_rng(abs(java_hash(src.name[0])))
+seeds = rng.integers(int(1e9), size=int(2e8))[args.batchNtrials*args.batchIndex: args.batchNtrials*(args.batchIndex + 1)]
+print("\n...Done\n")
+
+print("\n===== Scanning =====\n") 
+all_pixel_TS = sparse.lil_matrix((len(seeds), hp.nside2npix(64)), dtype=float)
+with time("allsky scramble scan"):
+    for no_trial, seed in enumerate(seeds):
+        if no_trial % (len(seeds) // 10) == 0:
+            print("Working on no_trial: {} \n".format(no_trial))
+        # scan (3,49152): -log10p, TS, ns
+        scan = sstr.get_one_scan(n_sig=0
+                                 , poisson=False
+                                 , seed=seed
+                                 , TRUTH=False
+                                 , mp_cpus=args.ncpu
+                                 , logging=False)
+        all_pixel_TS[no_trial] = scan[1]
+print("\n...Done\n")
+
+print("\n===== Converting to scipy.sparse and Save to disk =====\n")
+with time("To scipy.sparse npz"):
+    hp_sparse = all_pixel_TS.tocsr()
+    outfilename = args.outfilename
+    if not outfilename:
+        outfilename = "{}_batchSize{}_batchIndex{}_tw{}.npz".format(args.grb_name, 
+                                                                    args.batchNtrials, 
+                                                                    args.batchIndex, 
+                                                                    args.tw_in_second)
+## on locations other than OSG
+    output_folder = cy.utils.ensure_dir(ANA_DIR+"/allsky_scan/no_prior_versatile/low/tw{}".format(args.tw_in_second))
+    sparse.save_npz(output_folder+"/{}".format(outfilename)
+                    ,hp_sparse)
+#####################################################################    
+
 print("######## All Done. ###########")
