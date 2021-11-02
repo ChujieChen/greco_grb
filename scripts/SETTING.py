@@ -24,7 +24,7 @@ class PATH:
         elif username == "cjchen":
             print("\n#### Running at IceCube ####\n")
             location = "IceCube"
-            icdata_dir = "/data/user/cjchen/csky/analyses/online_GRECO/version-002-p04"
+            icdata_dir = "/data/user/cjchen/csky/analyses/online_GRECO/candidate-002-p10"
             data_dir = "/data/user/cjchen/2020-2021/Spring2021/greco_grb/data"
             ana_dir = data_dir + "/csky_output" 
         else: 
