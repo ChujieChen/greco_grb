@@ -48,12 +48,12 @@ def save_effective_trial(grb_name):
 
     hist, bin_edges = np.histogram(best_pvals, 
                                bins=np.r_[np.unique(best_pvals),1.2], 
-                               density=False)
+                               density=True)
     pre_trial_p = bin_edges
-    post_trial_p = np.r_[np.cumsum(hist) / best_pvals.size, 1]
+    post_trial_p = np.r_[np.cumsum(hist*np.diff(bin_edges)), 1]
     dt = np.dtype([('pre_trial_p', np.float32), ('post_trial_p', np.float32)])
 
-    pre_post = np.array([pre_trial_p, post_trial_p]).reshape(-1,2)
+    pre_post = np.transpose(np.array([pre_trial_p, post_trial_p]))
     pre_post = np.array(list(map(tuple, pre_post)), dtype=dt)
 
     np.save(ANA_DIR + f"/effective_trial/{grb_name}_effective_trial.npy", pre_post)
