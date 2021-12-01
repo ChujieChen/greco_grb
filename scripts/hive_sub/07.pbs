@@ -1,7 +1,7 @@
 #PBS -N 07
 #PBS -l nodes=1:ppn=1
 #PBS -l pmem=4gb
-#PBS -l walltime=1:00:00
+#PBS -l walltime=5:00:00
 #PBS -q hive
 #PBS -j oe
 #PBS -o /storage/home/hhive1/cchen641/scratch/icecube/job_pbs_out/out/07.out

@@ -36,27 +36,36 @@ def save_effective_trial(grb_name):
     bg_files = sorted(glob(ANA_DIR + f"/allsky_scan/with_prior_background/tw*/{grb_name}_*.npz"), 
                  key=lambda x: int(x[x.find("/tw")+3:x.find(f"/{grb_name}")]))
     assert len(bg_files) > 0, print(f"cannot find bkg files of {grb_name}")
-
+        
     bgs = np.array([sparse.load_npz(bg_file).toarray()[0] for bg_file in bg_files])
     bgs_sorted = np.apply_along_axis(sorted, 1, bgs)
-
+    
     pvals = []
     for bg, bg_sorted in zip(bgs, bgs_sorted):
         pvals.append(np.apply_along_axis(lambda x: (bg.size - np.searchsorted(bg_sorted, x, side='left')) / bg.size, 0, bg))
     pvals = np.array(pvals)
+    
+    #### save min_tw_p on the fly #####
+    min_tw_p = np.array([np.argmin(pvals, axis=0), pvals.min(axis=0)])
+    min_tw_p = np.transpose(min_tw_p)
+    min_tw_p = np.array(list(map(tuple, min_tw_p)), 
+                        dtype=np.dtype([('tw_idx', np.intc), ('min_p', np.float32)]))
+    np.save(ANA_DIR + f"/effective_trial/min_tw_p/{grb_name}_min_tw_p.npy", min_tw_p)
+    ####################################
+    
     best_pvals = np.sort(pvals.min(axis=0))
-
     hist, bin_edges = np.histogram(best_pvals, 
                                bins=np.r_[np.unique(best_pvals),1.2], 
                                density=True)
     pre_trial_p = bin_edges
     post_trial_p = np.r_[np.cumsum(hist*np.diff(bin_edges)), 1]
     dt = np.dtype([('pre_trial_p', np.float32), ('post_trial_p', np.float32)])
-
+    
     pre_post = np.transpose(np.array([pre_trial_p, post_trial_p]))
     pre_post = np.array(list(map(tuple, pre_post)), dtype=dt)
-
-    np.save(ANA_DIR + f"/effective_trial/{grb_name}_effective_trial.npy", pre_post)
+    
+    np.save(ANA_DIR + f"/effective_trial/pre_post/{grb_name}_effective_trial.npy", pre_post)
+    
     
     
 df = pd.read_pickle(DATA_DIR+"/grbwebgbm/grbweb_gbm_noHealpix_2268.pkl")
