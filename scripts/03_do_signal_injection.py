@@ -86,6 +86,7 @@ try:
     healpix = np.maximum(healpix,0)
     ########## healpix reduce (< instead of <=) ##########
     healpix[healpix < isf_healpix(healpix, q=0.99)] = 0
+    healpix = healpix / np.sum(healpix)
 except:
     raise Exception("Cannot load the healpix for grb: {}\n".format(args.grb_name))
     
@@ -133,11 +134,29 @@ ana = cy.get_analysis(cy.selections.repo
                       , dir=ANA_DIR
                       , load_sig=True)  # false to save memory if needed 
 
-#### used for spatial_prior_trial_runner
+############# used for spatial_prior_trial_runner
+# conf = {
+#     'ana': ana,
+#     #### llh basics: csky.conf
+#     'space': 'ps', # ps/fitps/template/prior
+#     'time': 'transient', # utf/lc/transient
+#     'energy': 'customflux', # fit/customflux
+#     'flux': cy.hyp.PowerLawFlux(2.5),
+#     #### inj.py - prior has some duplications against space's prior
+#     'sig': 'transient', # ps/tw/lc/transient/template/prior
+#     'full_sky': True,
+#     'extended': True,
+#     'mp_cpus': args.ncpu,
+#     'cut_n_sigma': 3
+#     }
+# cy.CONF.update(conf)
+
+
+############# used for basic trial_runner
 conf = {
     'ana': ana,
     #### llh basics: csky.conf
-    'space': 'ps', # ps/fitps/template/prior
+    'space': 'prior', # ps/fitps/template/prior
     'time': 'transient', # utf/lc/transient
     'energy': 'customflux', # fit/customflux
     'flux': cy.hyp.PowerLawFlux(2.5),
@@ -147,7 +166,7 @@ conf = {
     'extended': True,
     'mp_cpus': args.ncpu,
     'cut_n_sigma': 3
-    }
+}
 cy.CONF.update(conf)
 
 print("\n...Done\n")

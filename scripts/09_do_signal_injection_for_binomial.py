@@ -2,8 +2,6 @@
 #METAPROJECT: combo/stable
 #!/usr/bin/env python
 """
-['GRB140712A', 'GRB170610B', 'GRB170830C', 'GRB140414B', 'GRB160925A']
-
 6 time windows will be run in one single run
 """
 
@@ -47,7 +45,7 @@ import argparse
 ######################### CONFIGURE ARGUEMENTS #############################
 p = argparse.ArgumentParser(description="Signal Trials",
                             formatter_class=argparse.RawTextHelpFormatter)
-p.add_argument("--grb_name", default="GRB140712A", type=str, help="GRB name: GRByymmddC")
+p.add_argument("--grb_name", default="GRB180423A", type=str, help="GRB name: GRByymmddC")
 p.add_argument("--n_inj", default=0, type=float, help="Number of (poisson mean) injection")
 p.add_argument("--n_trials", default=500, type=int, help="Number of trials")
 ## p.add_argument("--tw_in_second", default=10, type=int, help="Length of the time window in seconds")
@@ -62,7 +60,6 @@ args = p.parse_args()
 # #     grb_name = "GRB180423A"    # real healpix example
 #     # grb_name = "GRB190415A"    # fake healpix example
 #     # grb_name = "GRB170529A"
-#     grb_name = "GRB140712A" # random_1
 #     n_inj = 10
 #     n_trials = 3
 # #     tw_in_second = 10
@@ -82,6 +79,7 @@ try:
     healpix = np.maximum(healpix,0)
     ########## healpix reduce (< instead of <=) ##########
     healpix[healpix < isf_healpix(healpix, q=0.99)] = 0
+    healpix = healpix / np.sum(healpix)
 except:
     raise Exception("Cannot load the healpix for grb: {}\n".format(args.grb_name))
     
@@ -127,11 +125,29 @@ ana = cy.get_analysis(cy.selections.repo
                       , dir=ANA_DIR
                       , load_sig=True)  # false to save memory if needed 
 
-#### used for spatial_prior_trial_runner
+# #### used for spatial_prior_trial_runner
+# conf = {
+#     'ana': ana,
+#     #### llh basics: csky.conf
+#     'space': 'ps', # ps/fitps/template/prior
+#     'time': 'transient', # utf/lc/transient
+#     'energy': 'customflux', # fit/customflux
+#     'flux': cy.hyp.PowerLawFlux(2.5),
+#     #### inj.py - prior has some duplications against space's prior
+#     'sig': 'transient', # ps/tw/lc/transient/template/prior
+#     'full_sky': True,
+#     'extended': True,
+#     'mp_cpus': args.ncpu,
+#     'cut_n_sigma': 3
+#     }
+# cy.CONF.update(conf)
+
+
+### used for basic trial_runner
 conf = {
     'ana': ana,
     #### llh basics: csky.conf
-    'space': 'ps', # ps/fitps/template/prior
+    'space': 'prior', # ps/fitps/template/prior
     'time': 'transient', # utf/lc/transient
     'energy': 'customflux', # fit/customflux
     'flux': cy.hyp.PowerLawFlux(2.5),
@@ -141,10 +157,12 @@ conf = {
     'extended': True,
     'mp_cpus': args.ncpu,
     'cut_n_sigma': 3
-    }
+}
 cy.CONF.update(conf)
 
 print("\n...Done\n")
+
+
 for tw_in_second in [10, 25, 50, 100, 250, 500]:
     print(f"\n===== Do trials for tw {tw_in_second} =====\n")
     tw = tw_in_second/86400.
@@ -161,7 +179,7 @@ for tw_in_second in [10, 25, 50, 100, 250, 500]:
     )
 
     rng=np.random.default_rng(abs(java_hash("GRB180423A"))) # same hash input as bkg trials
-    seeds = rng.integers(int(1e9), size=int(2e8))[:args.n_trials]
+    seeds = rng.integers(int(1e9), size=int(2e8))[args.n_trials*args.batchIndex: args.n_trials*(args.batchIndex + 1)]
 
 
     """
@@ -172,24 +190,23 @@ for tw_in_second in [10, 25, 50, 100, 250, 500]:
     """
 
     tr = cy.get_trial_runner(conf=cy.CONF, ana=ana, src=src)
-
+    
+    ################################### if file exists #############################################
+    if os.path.exists(ANA_DIR+f"/binomial_test/inj_binom/tw{tw_in_second}/{args.grb_name}/"+f"{args.grb_name}_batchSize{args.n_trials}_batchIndex{args.batchIndex}_tw{tw_in_second}_ninj{args.n_inj}.npy"):
+        continue
+    ################################################################################################
+        
     with time('Doing injections'):
-        """
-        trials = sptr.get_many_fits(args.n_trials, 
-                              n_sig=args.n_inj, 
-                              poisson=args.use_poisson, 
-                              seed=seed, 
-                              logging=False)
-        """
         trials_ts = []
         trials_ns = []
         for seed in seeds:
-            trial = tr.get_one_fit( 
-                              n_sig=args.n_inj, 
-                              poisson=args.use_poisson, 
-                              seed=seed, 
-                                TRUTH=False,
-                              logging=False)
+            trial = tr.get_one_fit(
+                n_sig=args.n_inj, 
+                poisson=args.use_poisson, 
+                seed=seed, 
+                TRUTH=False,
+                logging=False
+            )
             trials_ts.append(trial[0])
             trials_ns.append(trial[1])
         trials = cy.utils.Arrays({'ns':trials_ns, 'ts':trials_ts}, names=['ns', 'ts'])

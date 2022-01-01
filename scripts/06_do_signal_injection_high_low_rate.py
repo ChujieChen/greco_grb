@@ -139,11 +139,30 @@ N_bg_multiplier_low = 0.00420 / 0.00461
 #####################################################################
 ######################################## high ######################################################
 
-#### used for spatial_prior_trial_runner
+# #### used for spatial_prior_trial_runner
+# conf = {
+#     'ana': ana,
+#     #### llh basics: csky.conf
+#     'space': 'ps', # ps/fitps/template/prior
+#     'time': 'transient', # utf/lc/transient
+#     'energy': 'customflux', # fit/customflux
+#     'flux': cy.hyp.PowerLawFlux(2.5),
+#     #### inj.py - prior has some duplications against space's prior
+#     'sig': 'transient', # ps/tw/lc/transient/template/prior
+#     'full_sky': True,
+#     'extended': True,
+#     'mp_cpus': args.ncpu,
+#     'cut_n_sigma': 3,
+#     'N_bg_multiplier': N_bg_multiplier_high
+#     }
+# cy.CONF.update(conf)
+
+
+############# used for basic trial_runner
 conf = {
     'ana': ana,
     #### llh basics: csky.conf
-    'space': 'ps', # ps/fitps/template/prior
+    'space': 'prior', # ps/fitps/template/prior
     'time': 'transient', # utf/lc/transient
     'energy': 'customflux', # fit/customflux
     'flux': cy.hyp.PowerLawFlux(2.5),
@@ -152,10 +171,12 @@ conf = {
     'full_sky': True,
     'extended': True,
     'mp_cpus': args.ncpu,
-    'cut_n_sigma': 3,
-    'N_bg_multiplier': N_bg_multiplier_high
-    }
+    'cut_n_sigma': 3
+}
 cy.CONF.update(conf)
+
+
+
 
 print("\n...Done\n")
 
