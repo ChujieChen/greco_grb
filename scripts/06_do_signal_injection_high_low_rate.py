@@ -55,7 +55,7 @@ p = argparse.ArgumentParser(description="Signal Trials",
 p.add_argument("--grb_name", default="GRB180423A", type=str, help="GRB name: GRByymmddC")
 p.add_argument("--n_inj", default=0, type=float, help="Number of (poisson mean) injection")
 p.add_argument("--n_trials", default=500, type=int, help="Number of trials")
-p.add_argument("--tw_in_second", default=10, type=int, help="Length of the time window in seconds")
+## p.add_argument("--tw_in_second", default=10, type=int, help="Length of the time window in seconds")
 p.add_argument("--ncpu", default=4, type=int, help="Number of cores used")
 p.add_argument("--batchIndex", default=0, type=int, help="Current batchIdx for this n_inj with this tw_in_second")
 p.add_argument("--use_poisson", default=True, type=bool, help="Use poisson for n_inj")
@@ -86,12 +86,11 @@ try:
     healpix = np.maximum(healpix,0)
     ########## healpix reduce (< instead of <=) ##########
     healpix[healpix < isf_healpix(healpix, q=0.99)] = 0
+    healpix = healpix / np.sum(healpix)
 except:
     raise Exception("Cannot load the healpix for grb: {}\n".format(args.grb_name))
     
 grb_row = df.loc[df['grb_name'] == args.grb_name]
-tw = args.tw_in_second/86400.
-tw_start = grb_row.t_center - 0.5*tw
 ra = grb_row.ra
 dec = grb_row.dec
 print("\n...Done\n")
@@ -139,26 +138,7 @@ N_bg_multiplier_low = 0.00420 / 0.00461
 #####################################################################
 ######################################## high ######################################################
 
-# #### used for spatial_prior_trial_runner
-# conf = {
-#     'ana': ana,
-#     #### llh basics: csky.conf
-#     'space': 'ps', # ps/fitps/template/prior
-#     'time': 'transient', # utf/lc/transient
-#     'energy': 'customflux', # fit/customflux
-#     'flux': cy.hyp.PowerLawFlux(2.5),
-#     #### inj.py - prior has some duplications against space's prior
-#     'sig': 'transient', # ps/tw/lc/transient/template/prior
-#     'full_sky': True,
-#     'extended': True,
-#     'mp_cpus': args.ncpu,
-#     'cut_n_sigma': 3,
-#     'N_bg_multiplier': N_bg_multiplier_high
-#     }
-# cy.CONF.update(conf)
-
-
-############# used for basic trial_runner
+######################## HIGH ##############################
 conf = {
     'ana': ana,
     #### llh basics: csky.conf
@@ -171,76 +151,68 @@ conf = {
     'full_sky': True,
     'extended': True,
     'mp_cpus': args.ncpu,
-    'cut_n_sigma': 3
+    'cut_n_sigma': 3,
+    'N_bg_multiplier': N_bg_multiplier_high
 }
 cy.CONF.update(conf)
 
-
-
-
-print("\n...Done\n")
-
-print("\n===== Loading precomputed Bkg TS distribution =====\n")
-bg_files = glob(ANA_DIR+"/allsky_scan/with_prior_background/high/tw{}/{}*.npz".format(args.tw_in_second, args.grb_name))
-bg = cy.dists.Chi2TSD(np.ravel([sparse.load_npz(bg_file).toarray() for bg_file in bg_files]))
-print("\n...Done\n")
-
 print("\n===== Do trials =====\n")
-src = cy.sources(
-    ra=ra,
-    dec=dec,
-    deg=True,
-    mjd=tw_start, 
-    sigma_t=np.zeros_like(tw), 
-    t_100=tw,  # in days
-    prior=[hl.heal.HealHist(healpix)],
-    name=args.grb_name
-)
 
-seed = abs(java_hash(src.name[0]+"_signal_batchIndex{}".format(args.batchIndex)))
+for tw_in_second in [10, 25, 50, 100, 250, 500]:
+    print(f"\n===== Do HIGH trials for tw {tw_in_second} =====\n")
+    tw = tw_in_second/86400.
+    tw_start = grb_row.t_center - 0.5*tw
+    src = cy.sources(
+        ra=ra,
+        dec=dec,
+        deg=True,
+        mjd=tw_start, 
+        sigma_t=np.zeros_like(tw), 
+        t_100=tw,  # in days
+        prior=[hl.heal.HealHist(healpix)],
+        name=args.grb_name
+    )
 
-"""
-sptr = cy.get_spatial_prior_trial_runner(conf=cy.CONF
-                                         ,src_tr=src
-                                         ,llh_priors=[healpix]
-                                         ,cut_n_sigma=5.) # src_tr is must for transient
-"""
+    rng=np.random.default_rng(abs(java_hash("GRB180423A"))) # same hash input as bkg trials
+    seeds = rng.integers(int(1e9), size=int(2e8))[args.n_trials*args.batchIndex: args.n_trials*(args.batchIndex + 1)]
+    tr = cy.get_trial_runner(conf=cy.CONF, ana=ana, src=src)
+    ################################################################################################
+        
+    with time('Doing injections'):
+        trials_ts = []
+        trials_ns = []
+        for seed in seeds:
+            trial = tr.get_one_fit(
+                n_sig=args.n_inj, 
+                poisson=args.use_poisson, 
+                seed=seed, 
+                TRUTH=False,
+                logging=False
+            )
+            trials_ts.append(trial[0])
+            trials_ns.append(trial[1])
+        trials = cy.utils.Arrays({'ns':trials_ns, 'ts':trials_ts}, names=['ns', 'ts'])
+    print("\n...Done\n")
+    # print("\n===== Saving results =====\n")
+    outfilename = "{}_batchSize{}_batchIndex{}_tw{}_ninj{}.npy".format(args.grb_name, 
+                                                                        args.n_trials, 
+                                                                        args.batchIndex, 
+                                                                        tw_in_second, 
+                                                                       args.n_inj)
 
-tr = cy.get_trial_runner(conf=cy.CONF, ana=ana, src=src)
-
-with time('Doing injections'):
-    """
-    trials = sptr.get_many_fits(args.n_trials, 
-                          n_sig=args.n_inj, 
-                          poisson=args.use_poisson, 
-                          seed=seed, 
-                          logging=False)
-    """
-    trials = tr.get_many_fits(args.n_trials, 
-                      n_sig=args.n_inj, 
-                      poisson=args.use_poisson, 
-                      seed=0, 
-                      logging=False)
-    
-print("\n...Done\n")
-print("\n===== Saving results =====\n")
-outfilename = "{}_batchSize{}_batchIndex{}_tw{}_ninj{}.npy".format(args.grb_name, 
-                                                                    args.n_trials, 
-                                                                    args.batchIndex, 
-                                                                    args.tw_in_second, 
-                                                                   args.n_inj)
-
-output_folder = cy.utils.ensure_dir(ANA_DIR+"/prior_injection/high/tw{}/{}".format(args.tw_in_second, 
+    output_folder = cy.utils.ensure_dir(ANA_DIR+"/prior_injection/high/tw{}/{}".format(tw_in_second, 
                                                                               args.grb_name))
-np.save(output_folder + "/" + outfilename, trials.as_array)
-
+    np.save(output_folder + "/" + outfilename, trials.as_array)
+    print("\nHIGH Done\n")
+    
+    
+    
 ######################################## low ######################################################
-
-#### used for spatial_prior_trial_runner
+######################## LOW ##############################
 conf = {
     'ana': ana,
     #### llh basics: csky.conf
-    'space': 'ps', # ps/fitps/template/prior
+    'space': 'prior', # ps/fitps/template/prior
     'time': 'transient', # utf/lc/transient
     'energy': 'customflux', # fit/customflux
     'flux': cy.hyp.PowerLawFlux(2.5),
@@ -251,64 +223,57 @@ conf = {
     'mp_cpus': args.ncpu,
     'cut_n_sigma': 3,
     'N_bg_multiplier': N_bg_multiplier_low
-    }
+}
 cy.CONF.update(conf)
 
-print("\n...Done\n")
-
-print("\n===== Loading precomputed Bkg TS distribution =====\n")
-bg_files = glob(ANA_DIR+"/allsky_scan/with_prior_background/low/tw{}/{}*.npz".format(args.tw_in_second, args.grb_name))
-bg = cy.dists.Chi2TSD(np.ravel([sparse.load_npz(bg_file).toarray() for bg_file in bg_files]))
-print("\n...Done\n")
-
 print("\n===== Do trials =====\n")
-src = cy.sources(
-    ra=ra,
-    dec=dec,
-    deg=True,
-    mjd=tw_start, 
-    sigma_t=np.zeros_like(tw), 
-    t_100=tw,  # in days
-    prior=[hl.heal.HealHist(healpix)],
-    name=args.grb_name
-)
 
-seed = abs(java_hash(src.name[0]+"_signal_batchIndex{}".format(args.batchIndex)))
-
-"""
-sptr = cy.get_spatial_prior_trial_runner(conf=cy.CONF
-                                         ,src_tr=src
-                                         ,llh_priors=[healpix]
-                                         ,cut_n_sigma=5.) # src_tr is must for transient
-"""
-
-tr = cy.get_trial_runner(conf=cy.CONF, ana=ana, src=src)
-
-with time('Doing injections'):
-    """
-    trials = sptr.get_many_fits(args.n_trials, 
-                          n_sig=args.n_inj, 
-                          poisson=args.use_poisson, 
-                          seed=seed, 
-                          logging=False)
-    """
-    trials = tr.get_many_fits(args.n_trials, 
-                      n_sig=args.n_inj, 
-                      poisson=args.use_poisson, 
-                      seed=0, 
-                      logging=False)
+for tw_in_second in [10, 25, 50, 100, 250, 500]:
+    print(f"\n===== Do LOW trials for tw {tw_in_second} =====\n")
     
-print("\n...Done\n")
-print("\n===== Saving results =====\n")
-outfilename = "{}_batchSize{}_batchIndex{}_tw{}_ninj{}.npy".format(args.grb_name, 
-                                                                    args.n_trials, 
-                                                                    args.batchIndex, 
-                                                                    args.tw_in_second, 
-                                                                   args.n_inj)
+    tw = tw_in_second/86400.
+    tw_start = grb_row.t_center - 0.5*tw
+    src = cy.sources(
+        ra=ra,
+        dec=dec,
+        deg=True,
+        mjd=tw_start, 
+        sigma_t=np.zeros_like(tw), 
+        t_100=tw,  # in days
+        prior=[hl.heal.HealHist(healpix)],
+        name=args.grb_name
+    )
 
-output_folder = cy.utils.ensure_dir(ANA_DIR+"/prior_injection/low/tw{}/{}".format(args.tw_in_second, 
+    rng=np.random.default_rng(abs(java_hash("GRB180423A"))) # same hash input as bkg trials
+    seeds = rng.integers(int(1e9), size=int(2e8))[args.n_trials*args.batchIndex: args.n_trials*(args.batchIndex + 1)]
+
+    tr = cy.get_trial_runner(conf=cy.CONF, ana=ana, src=src)
+    ################################################################################################
+        
+    with time('Doing injections'):
+        trials_ts = []
+        trials_ns = []
+        for seed in seeds:
+            trial = tr.get_one_fit(
+                n_sig=args.n_inj, 
+                poisson=args.use_poisson, 
+                seed=seed, 
+                TRUTH=False,
+                logging=False
+            )
+            trials_ts.append(trial[0])
+            trials_ns.append(trial[1])
+        trials = cy.utils.Arrays({'ns':trials_ns, 'ts':trials_ts}, names=['ns', 'ts'])
+    print("\n...Done\n")
+
+    # print("\n===== Saving results =====\n")
+    outfilename = "{}_batchSize{}_batchIndex{}_tw{}_ninj{}.npy".format(args.grb_name, 
+                                                                        args.n_trials, 
+                                                                        args.batchIndex, 
+                                                                        tw_in_second, 
+                                                                       args.n_inj)
+
+    output_folder = cy.utils.ensure_dir(ANA_DIR+"/prior_injection/low/tw{}/{}".format(tw_in_second, 
                                                                               args.grb_name))
-np.save(output_folder + "/" + outfilename, trials.as_array)
-
-
-print("\nAll Done\n")
+    np.save(output_folder + "/" + outfilename, trials.as_array)
+    print("\nLOW Done\n")
