@@ -24,7 +24,8 @@ class PATH:
         elif username == "cjchen":
             print("\n#### Running at IceCube ####\n")
             location = "IceCube"
-            icdata_dir = "/data/user/cjchen/csky/analyses/online_GRECO/candidate-002-p10"
+            # icdata_dir = "/data/user/cjchen/csky/analyses/online_GRECO/candidate-002-p10"
+            icdata_dir = "/data/ana/analyses/greco_online/version-002-p10"
             data_dir = "/data/user/cjchen/2020-2021/Spring2021/greco_grb/data"
             ana_dir = data_dir + "/csky_output" 
         else: 
@@ -35,7 +36,11 @@ class PATH:
                 data_dir = "/cvmfs/icecube.opensciencegrid.org/users/cjchen/data/greco_grb/data"
                 ana_dir = ""    ## output path is unknown on OSG 
             else:
-                print("#### USER not recognized ####\n")
+                print("#### general USER at IceCube ####\n")
+                location = "IceCube-general"
+                icdata_dir = "/data/ana/analyses/greco_online/version-002-p10"
+                data_dir = "/data/ana/analyses/NuSources/2022_GRECO_GRB"
+                ana_dir = data_dir + "/csky_output" 
         
         self.LOCATION = location
         self.USER = username
