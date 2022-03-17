@@ -3,6 +3,9 @@ Some of my commonly used functions
 """
 import numpy as np
 from scipy import sparse
+import csky as cy
+import collections
+Trial = collections.namedtuple('Trial', 'evss n_exs')
 
 def java_hash(s):
     """
@@ -159,3 +162,33 @@ def getCombinedMaxTSfromFile(healpix, file):
     TSs = np.hstack(np.array(TSs))
     return TSs
 
+def Clean_sig_trial(fun_trial, tr, src):
+    trial = fun_trial
+    flat_dec = tr.scan_dec
+    flat_ra = tr.scan_ra
+    cut_n_sigma = 5
+    evss = trial.evss
+    if( evss[0] ):
+        all_evs = evss[0][0][:0]
+        for ev_list in evss:
+            for evs in ev_list:
+                for ev in evs:
+                    if( src.mjd[0]<ev.mjd[0]<(src.mjd[0]+src.t_100[0]) ):
+                        all_evs += ev
+        trial = Trial([[all_evs]], [0])
+
+        if( len(all_evs)==0 ):
+            trial = None
+        elif( len(all_evs)<100 ):
+            delta_angle_pix_evss = cy.coord.delta_angle(
+                flat_dec, flat_ra, all_evs.dec, all_evs.ra, latlon=True)
+            min_sigma_per_pix = np.amin(
+                delta_angle_pix_evss/all_evs.sigma, axis=1)
+            evs_mask = min_sigma_per_pix<cut_n_sigma
+
+            mask = tr.llh_mask_all & evs_mask      
+            if( not np.any(mask) ):
+                trial = None
+    else:
+        trial = None
+    return trial

@@ -1,15 +1,5 @@
-#!/bin/sh /cvmfs/icecube.opensciencegrid.org/py3-v4.1.0/icetray-start
-#METAPROJECT: combo/stable
-#!/usr/bin/env python
 """
-1 GBM-GRB + 1 nonGBM-GRB = 2 GRBs (two different qsub)
-6 time windows
-40  different injections (0 ~ 9.1, step=0.2)
-500 trials for each n_inj (run on 1 core)
-20 s/trial
-= 2k cpu hr = 1000 hivecpu * 2 hr
-
-tws_in_second    = [  10,     25,    50,   100,   250,   500][::-1] 
+Inline multiple time windows
 """
 
 import os
@@ -52,7 +42,7 @@ import argparse
 ######################### CONFIGURE ARGUEMENTS #############################
 p = argparse.ArgumentParser(description="Signal Trials",
                             formatter_class=argparse.RawTextHelpFormatter)
-p.add_argument("--grb_name", default="GRB180423A", type=str, help="GRB name: GRByymmddC")
+p.add_argument("--grb_name", default="GRB140807A", type=str, help="GRB name: GRByymmddC")
 p.add_argument("--n_inj", default=0, type=float, help="Number of (poisson mean) injection")
 p.add_argument("--n_trials", default=500, type=int, help="Number of trials")
 p.add_argument("--ncpu", default=4, type=int, help="Number of cores used")
@@ -64,15 +54,13 @@ args = p.parse_args()
 
 ### testing on jupyter ###
 # class args:
-#     grb_name = "GRB180423A"    # real healpix example
-#     # grb_name = "GRB190415A"    # fake healpix example
-#     # grb_name = "GRB170529A"
+#     grb_name = "GRB140807A"    # unblinding top-1
 #     n_inj = 10
 #     n_trials = 10
-#     tw_in_second = 10
 #     ncpu = 4
 #     batchIndex = 0
 #     use_poisson = True
+#     gamma=2.5
 ##########################
 
 print("\n===== Loading no-healpix df =====\n")
@@ -133,49 +121,27 @@ ana = cy.get_analysis(cy.selections.repo
                       , load_sig=True)  # false to save memory if needed 
 
 ############# used for spatial_prior_trial_runner
-# conf = {
-#     'ana': ana,
-#     #### llh basics: csky.conf
-#     'space': 'ps', # ps/fitps/template/prior
-#     'time': 'transient', # utf/lc/transient
-#     'energy': 'customflux', # fit/customflux
-#     'flux': cy.hyp.PowerLawFlux(2.5),
-#     #### inj.py - prior has some duplications against space's prior
-#     'sig': 'transient', # ps/tw/lc/transient/template/prior
-#     'full_sky': True,
-#     'extended': True,
-#     'mp_cpus': args.ncpu,
-#     'cut_n_sigma': 3
-#     }
-# cy.CONF.update(conf)
-
-
-############# used for basic trial_runner
 conf = {
     'ana': ana,
     #### llh basics: csky.conf
-    'space': 'prior', # ps/fitps/template/prior
+    'space': 'ps', # ps/fitps/template/prior
     'time': 'transient', # utf/lc/transient
     'energy': 'customflux', # fit/customflux
-    'flux': cy.hyp.PowerLawFlux(args.gamma),
+    'flux': cy.hyp.PowerLawFlux(2.5),
     #### inj.py - prior has some duplications against space's prior
     'sig': 'transient', # ps/tw/lc/transient/template/prior
     'full_sky': True,
     'extended': True,
     'mp_cpus': args.ncpu,
     'cut_n_sigma': 3
-}
+    }
 cy.CONF.update(conf)
 
-print("\n...Done\n")
-
-print("\n===== Do trials =====\n")
-
 for tw_in_second in [10, 25, 50, 100, 250, 500]:
+    tss, nss = [], []
     print(f"\n===== Do trials for tw {tw_in_second} =====\n")
     tw = tw_in_second/86400.
     tw_start = grb_row.t_center - 0.5*tw
-    
     src = cy.sources(
         ra=ra,
         dec=dec,
@@ -186,39 +152,36 @@ for tw_in_second in [10, 25, 50, 100, 250, 500]:
         prior=[hl.heal.HealHist(healpix)],
         name=args.grb_name
     )
-
-    seed = abs(java_hash(src.name[0]+"_signal_batchIndex{}".format(args.batchIndex)))
-
-    tr = cy.get_trial_runner(conf=cy.CONF, ana=ana, src=src)
-
-    with time('Doing injections'):
-        trials = tr.get_many_fits(args.n_trials, 
-                          n_sig=args.n_inj, 
-                          poisson=args.use_poisson, 
-                          seed=seed, 
-                          logging=False)
-
-    print("\n...Done\n")
+    sptr = cy.get_spatial_prior_trial_runner(conf=cy.CONF
+                                             ,src_tr=src
+                                             ,llh_priors=[healpix])
+    rng=np.random.default_rng(abs(java_hash("GRB180423A"))) # same hash input as bkg trials
+    seeds = rng.integers(int(1e9), size=int(2e8))[args.n_trials*args.batchIndex: args.n_trials*(args.batchIndex + 1)]
+    print(f"\n===== Do {args.n_trials} injections with n_inj={args.n_inj} =====\n")
+    for seed in seeds:
+        trial = sptr.get_one_trial(n_sig=args.n_inj, 
+                              poisson=args.use_poisson,
+                             seed=seed)
+        cleaned_trial = Clean_sig_trial(trial, sptr, src)
+        try:
+            result = _, ts, ns, _, _ = sptr.get_one_fit_from_trial(cleaned_trial, 
+                                              mp_cpus=args.ncpu, 
+                                              logging=False)
+        except:
+            ts, ns = 0.0, 0.0
+        tss.append(ts)
+        nss.append(ns)
+    trials = cy.utils.Arrays({'ns':nss, 'ts':tss}, names=['ns', 'ts'])
+    
     print("\n===== Saving results =====\n")
     outfilename = "{}_batchSize{}_batchIndex{}_tw{}_ninj{}.npy".format(args.grb_name, 
                                                                         args.n_trials, 
                                                                         args.batchIndex, 
                                                                         tw_in_second, 
                                                                        args.n_inj)
-    if args.gamma == 2.5:
-        output_folder = cy.utils.ensure_dir(ANA_DIR+"/prior_injection/tw{}/{}".format(tw_in_second, 
-                                                                                  args.grb_name))
-    else:
-        output_folder = cy.utils.ensure_dir(ANA_DIR+"/prior_injection/gamma_{:.2f}/tw{}/{}".format(args.gamma, 
+    
+    output_folder = cy.utils.ensure_dir(ANA_DIR+"/prior_injection/gamma_{:.2f}/tw{}/{}".format(args.gamma, 
                                                                                                    tw_in_second, 
                                                                                                   args.grb_name))
-
     np.save(output_folder + "/" + outfilename, trials.as_array)
-print("\nAll Done\n")
-
-
-
-
-
-
-
+    

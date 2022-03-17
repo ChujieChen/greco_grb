@@ -66,10 +66,28 @@ ana = cy.get_analysis(cy.selections.repo
                       , dir=ANA_DIR
                       , load_sig=True)  # to save memory: use False
 
+############# used for basic trial_runner
+# conf = {
+#     'ana': ana,
+#     #### llh basics: csky.conf
+#     'space': 'prior', # ps/fitps/template/prior
+#     'time': 'transient', # utf/lc/transient
+#     'energy': 'customflux', # fit/customflux
+#     'flux': cy.hyp.PowerLawFlux(2.5),
+#     #### inj.py - prior has some duplications against space's prior
+#     'sig': 'transient', # ps/tw/lc/transient/template/prior
+#     'full_sky': True,
+#     'extended': True,
+#     'cut_n_sigma': 3,
+#     "TRUTH": True,
+#     'mp_cpus': args.ncpu
+# }
+
+############# used for spatial_prior_trial_runner
 conf = {
     'ana': ana,
     #### llh basics: csky.conf
-    'space': 'prior', # ps/fitps/template/prior
+    'space': 'ps', # ps/fitps/template/prior
     'time': 'transient', # utf/lc/transient
     'energy': 'customflux', # fit/customflux
     'flux': cy.hyp.PowerLawFlux(2.5),
@@ -77,10 +95,10 @@ conf = {
     'sig': 'transient', # ps/tw/lc/transient/template/prior
     'full_sky': True,
     'extended': True,
-    'cut_n_sigma': 3,
-    "TRUTH": True,
-    'mp_cpus': args.ncpu
+    'mp_cpus': args.ncpu,
+    'cut_n_sigma': 3
 }
+
 cy.CONF.update(conf)
 
 df = pd.read_pickle(DATA_DIR+"/grbwebgbm/grbweb_gbm_noHealpix_2268.pkl")
@@ -89,6 +107,7 @@ df = pd.read_pickle(DATA_DIR+"/grbwebgbm/grbweb_gbm_noHealpix_2268.pkl")
 for grb_idx in range(args.grb_idx_start, args.grb_idx_end):
     # load grb info
     grb_name = df.grb_name[grb_idx]
+    print(f"Woring on {grb_name}")
     grb_row = df.loc[df['grb_name'] == grb_name]
     ra = grb_row.ra
     dec = grb_row.dec
@@ -113,9 +132,16 @@ for grb_idx in range(args.grb_idx_start, args.grb_idx_end):
             prior=[hl.heal.HealHist(healpix)],
             name=grb_name
         )
-        tr = cy.get_trial_runner(conf=cy.CONF, ana=ana, src=src)
         print(f"tw_in_second = {tw_in_second}")
-        result = ts, ns = tr.get_one_fit(TRUTH=True)
+        # tr = cy.get_trial_runner(conf=cy.CONF, ana=ana, src=src)
+        # result = ts, ns = tr.get_one_fit(TRUTH=True)
+        sptr = cy.get_spatial_prior_trial_runner(conf=cy.CONF
+                                         ,src_tr=src
+                                         ,llh_priors=[healpix])
+        try:
+            result = _, ts, ns, ra, dec = sptr.get_one_fit(TRUTH=True, mp_cpus=args.ncpu, logging=False)
+        except:
+            ts, ns = 0.0, 0.0
         tss.append(ts)
         nss.append(ns)
     # get pvals
